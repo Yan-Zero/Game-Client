@@ -18,11 +18,11 @@ def check_name(str) -> bool:
   return True
 
 def info(player: Player, lexer: Lexer):
-  value = lexer.get_next_token()
+  value = lexer.scan()
   if value == "room":
     pass
   elif value == "player":
-    value = lexer.get_next_token()
+    value = lexer.scan()
     if value == "":
       value = str(player.uid)
     try:
@@ -42,12 +42,12 @@ def client_exit(player: Player, lexer: Lexer):
   return None
 
 def rename(player: Player, lexer: Lexer):
-  tk = lexer.get_next_token()
+  tk = lexer.scan()
   if not check_name(tk):
     player.send('error "Invalid name!"')
     return 'set name ' + player.name + ' -f'
   player.name = tk
-  if lexer.get_next_token() == "-s":
+  if lexer.scan() == "-s":
     return None
   return 'show_message Server "  Your name is ' + player.name + ' now."'
 
@@ -70,7 +70,7 @@ Help_Info = {
 }
 
 def help(player: Player, lexer: Lexer):
-  tk = lexer.get_next_token()
+  tk = lexer.scan()
   if tk in Help_Info:
     return f'show_help "{tk}:" "' + '" "'.join(Help_Info[tk]) + "\""
   else:
@@ -91,7 +91,7 @@ Function_Map = {
 
 def Player_Command(player: Player, data: str):
   tk = Lexer(data)
-  command = tk.get_next_token()
+  command = tk.scan()
   if command == "":
     return None
   if command in Function_Map:
@@ -102,10 +102,10 @@ def Handler(clientsocket: socket, addr):
   # 对接
   data = clientsocket.recv(1024).decode('utf-8')
   tk = Lexer(data)
-  if tk.get_next_token() != "encode":
+  if tk.scan() != "encode":
       clientsocket.close()
       return
-  encoding = tk.get_next_token()
+  encoding = tk.scan()
   clientsocket.send('OK'.encode(encoding))
 
   # 校验身份，分配 id，并重命名

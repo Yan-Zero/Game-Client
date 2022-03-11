@@ -106,14 +106,14 @@ void exit_program(string &arg) {
 void set(string &arg)
 {
   Lexer lexer(arg);
-  auto arg_ = lexer.get_next_token();
-  auto value = lexer.get_next_token();
-  if(arg_ == Token::TokenType::EOC)
+  auto arg_ = lexer.scan();
+  auto value = lexer.scan();
+  if(arg_ == Token::TokenType::End)
   {
     arg = "set";
     help(arg);
   }
-  elif(value == Token::TokenType::EOC)
+  elif(value == Token::TokenType::End)
   {
     cout << "Please input the value." << endl;
     return;
@@ -131,7 +131,7 @@ void set(string &arg)
       else return c;
     });
     cout << "name set to " << name << endl;
-    if(lexer.get_next_token().value() != "-f")
+    if(lexer.scan().value() != "-f")
       sock.Send("rename " + name);
   }
   elif(arg_ == "server")
@@ -150,7 +150,7 @@ void set(string &arg)
 }
 void room(string &arg) {
   Lexer token(arg);
-  auto tk = token.get_next_token();
+  auto tk = token.scan();
   if(tk == "list")
     sock.Send("list room");
   else
@@ -182,7 +182,7 @@ void info(string &arg) {
     return;
   }
   Lexer lexer(arg);
-  auto tk = lexer.get_next_token();
+  auto tk = lexer.scan();
   if(tk == "room")
     sock.Send("info " + arg);
   elif(tk == "player")
@@ -194,11 +194,11 @@ void update_help(string &arg)
 {
   Lexer lexer(arg);
   cout << arg << endl;
-  auto tk = lexer.get_next_token();
-  while(tk.type() != Token::TokenType::EOC)
+  auto tk = lexer.scan();
+  while(tk.type() != Token::TokenType::End)
   {
-    cmd_list[tk.value()] = lexer.get_next_token().value();
-    tk = lexer.get_next_token();
+    cmd_list[tk.value()] = lexer.scan().value();
+    tk = lexer.scan();
   }
 }
 
@@ -209,15 +209,15 @@ void deal_command_from_server(string &arg)
   Lexer lexer(arg);
   string tmp;
 
-  auto tk = lexer.get_next_token();
-  while(tk.type() != Token::TokenType::EOC)
+  auto tk = lexer.scan();
+  while(tk.type() != Token::TokenType::End)
   {
     if(tk== Token::TokenType::LeftBracket)
     {
-      auto command = lexer.get_next_token();
+      auto command = lexer.scan();
       index = lexer.get_pos();
       while(tk.type() != Token::TokenType::RightBracket)
-        tk = lexer.get_next_token();
+        tk = lexer.scan();
       auto it = func_map.find(command.value());
       if(it == func_map.end())
         cout << "Unknown command: " << command.value() << endl;

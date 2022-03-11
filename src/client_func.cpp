@@ -8,30 +8,30 @@ using namespace std;
 
 void error(string &arg) {
   Lexer lexer(arg);
-  auto tk = lexer.get_next_token();
-  while(tk.type() != Token::TokenType::EOC)
+  auto tk = lexer.scan();
+  while(tk.type() != Token::TokenType::End)
   {
     cout << "Error: " << tk.value() << endl;
-    tk = lexer.get_next_token();
+    tk = lexer.scan();
   }
 }
 void show_message(string &arg) {
   Lexer lexer(arg);
-  cout << "Message From " << lexer.get_next_token().value() << ": " << endl;
-  auto token = lexer.get_next_token();
-  while(token.type() != Token::TokenType::EOC)
+  cout << "Message From " << lexer.scan().value() << ": " << endl;
+  auto token = lexer.scan();
+  while(token.type() != Token::TokenType::End)
   {
     cout << " |" << token.value() << endl;
-    token = lexer.get_next_token();
+    token = lexer.scan();
   }
   cout << endl;
 }
 void show_help(string &arg) {
   Lexer lexer(arg);
-  auto token = lexer.get_next_token();
-  while(token.type() != Token::TokenType::EOC)
+  auto token = lexer.scan();
+  while(token.type() != Token::TokenType::End)
   {
-    token = lexer.get_next_token();
+    token = lexer.scan();
     cout << token.value() << endl;
   }
 }

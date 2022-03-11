@@ -12,7 +12,7 @@ class Token
 {
 public:
   enum class TokenType {
-    EOC,
+    End,
     String,
     LeftBracket,
     RightBracket, 
@@ -21,51 +21,64 @@ public:
     Comma,
   };
 
-  Token(TokenType type) : type_(type) {}
-  Token(std::string str, TokenType type) : str_(str), type_(type) {};
-  inline TokenType type() { return type_; }
-  inline std::string value() { return str_; }
+  Token(TokenType type) : m_type(type) {}
+  Token(std::string str, TokenType type) : m_str(str), m_type(type) {};
+  inline TokenType type() { return m_type; }
+  inline std::string value() { return m_str; }
   inline bool operator==(const Token &other) {
-    return type_ == other.type_ && str_ == other.str_;
+    return m_type == other.m_type && m_str == other.m_str;
   }
   inline bool operator==(const TokenType &other) {
-    return type_ != TokenType::String && type_ == other;
+    return m_type != TokenType::String && m_type == other;
   }
   inline bool operator==(const std::string &other) {
-    return type_ == TokenType::String && str_ == other;
+    return m_type == TokenType::String && m_str == other;
   }
 
 private:
-  std::string str_;
-  TokenType type_;
+  std::string m_str;
+  TokenType m_type;
 };
 
 class Lexer
 {
 public:
   Lexer(std::string &str) {
-    str_ = string_trim(str);
-    pos_ = 0;
+    m_str = string_trim(str);
+    m_pos = 0;
   };
 
-  Token get_next_token();
-  size_t get_pos() { return pos_; }
+  Token scan();
+  size_t get_pos() { return m_pos; }
 
 private:
-  std::string str_;
-  size_t pos_;
-  Token lookahead = Token(Token::TokenType::EOC);
+  std::string m_str;
+  size_t m_pos;
+  char m_ch;
 
   inline void ignore_space()
   {
-    while(str_[pos_] == ' ' || str_[pos_] == '\t' || str_[pos_] == '\n' || str_[pos_] == '\r' || str_[pos_] == '\f' || str_[pos_] == '\v')
-    {
-      pos_++;
-      if(pos_ >= str_.size())
-        return;
-    }
+    while(m_ch == ' '  || m_ch == '\t' || m_ch == '\n' 
+       || m_ch == '\r' || m_ch == '\f' || m_ch == '\v')
+      read_char();
   }
   std::string get_string();
+  inline void read_char()
+  {
+    if (m_pos >= m_str.size())
+      m_ch = '\0';
+    else
+      m_ch = m_str[m_pos];
+    m_pos++;
+  }
+  inline bool read_char(char c)
+  {
+    read_char();
+    if(m_ch != c)
+      return false;
+    m_ch = ' ';
+    return true;
+  }
 
 };
 
