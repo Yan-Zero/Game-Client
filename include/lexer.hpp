@@ -12,12 +12,21 @@ class Token
 {
 public:
   enum class TokenType {
-    kString,
     kEnd,
+    kString,
+    kLeftBracket,
+    kRightBracket, 
   };
 
   Token(TokenType type) : type_(type) {}
-  Token(std::string str) : str_(str) { type_ = TokenType::kString; }
+  Token(std::string str) : str_(str) { 
+    if(str == "{")
+      type_ = TokenType::kLeftBracket;
+    elif(str == "}")
+      type_ = TokenType::kRightBracket;
+    else
+      type_ = TokenType::kString;
+  }
   Token(std::string str, TokenType type) : str_(str), type_(type) {};
   inline TokenType type() { return type_; }
   inline std::string value() { return str_; }
@@ -35,15 +44,14 @@ public:
     pos_ = 0;
   };
 
-  Token get_next();
+  Token get_next_token();
 
-  size_t get_pos() {
-    return pos_;
-  }
+  size_t get_pos() { return pos_; }
 
 private:
   std::string str_;
   size_t pos_;
+  Token lookahead = Token("");
 
   inline void ignore_space()
   {
@@ -55,6 +63,7 @@ private:
     }
   }
   std::string get_string();
+
 };
 
 #endif

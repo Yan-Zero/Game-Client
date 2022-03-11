@@ -80,7 +80,7 @@ class Player:
         self.name = name
 
     def send(self, msg: str):
-        self.sock.send(bytes(msg, self.encoding))
+        self.sock.send(b"{" + bytes(msg, self.encoding) + b'}')
 
     def recv(self) -> str:
         return self.sock.recv(1024).decode(self.encoding)
@@ -136,12 +136,20 @@ def help(player: Player, lexer: Lexer):
     if tk in Help_Info:
         return f'show_help "{tk}:" "' + '" "'.join(Help_Info[tk]) + "\""
     else:
-        return f'error "Unknown command: {tk}!"'
+        return f'error "HELP - Unknown command: {tk}!\n"'
+
+Help_List = {
+    "room":   "room:     the command of room. Please type 'help room' to see more.",
+}
+
+def update_help(player: Player, lexer: Lexer):
+    for key in Help_List:
+        player.send(f'update_help "{key}" "{Help_List[key]}"')
+    return None
 
 def rename(player: Player, lexer: Lexer):
     tk = lexer.get_next()
     if not check_name(tk):
-        player.send('recv 2')
         player.send('error "Invalid name!"')
         return 'set name ' + player.name + ' -f'
     player.name = tk
@@ -154,6 +162,7 @@ Function_Map = {
     "exit": client_exit,
     "help": help,
     "rename": rename,
+    "update_help": update_help,
 }
 
 def Player_Command(player: Player, data: str):
@@ -183,6 +192,7 @@ def Handler(clientsocket: socket, addr):
     Players[uid] = player
     Player_Command(player, data)
     player.send('set __id__ ' + str(player.uid))
+    Player_Command(player, 'update_help')
 
     # 正式运行
     while True:
@@ -218,6 +228,9 @@ while True:
         break
     elif i == 'q':
         break
+    elif i[0] == 'E':
+        for player in Players.values():
+            player.send(i[1:])
     else:
         for player in Players.values():
             player.send("show_message Server \"" + i + "\"")

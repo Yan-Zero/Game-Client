@@ -5,7 +5,7 @@
 
 using namespace std;
 
-Token Lexer::get_next()
+Token Lexer::get_next_token()
 {
   ignore_space();
   if(pos_ >= str_.size())
@@ -13,10 +13,51 @@ Token Lexer::get_next()
   string ret;
   if(str_[pos_] == '"' || str_[pos_] == '\'')
     return Token(get_string(), Token::TokenType::kString);
+  elif(str_[pos_] == '{')
+  {
+    ++pos_;
+    return Token("{", Token::TokenType::kLeftBracket);
+  }
+  elif(str_[pos_] == '}')
+  {
+    ++pos_;
+    return Token("}", Token::TokenType::kRightBracket);
+  }
   else
-    ret = str_.substr(pos_, str_.find(" ", pos_) - pos_);
-  pos_ += ret.size() + 1;
-  return Token(ret);
+  {
+    while(str_[pos_] != ' ' && str_[pos_] != '\t' 
+      && str_[pos_] != '\n' && str_[pos_] != '\r' 
+      && str_[pos_] != '\f' && str_[pos_] != '\v' 
+      && str_[pos_] != '{' && str_[pos_] != '}')
+    {
+      if(pos_ >= str_.size())
+        break;
+      if(str_[pos_] == '\\')
+      {
+        ++pos_;
+        if(pos_ >= str_.size())
+          break;
+        if(str_[pos_] == 'n')
+          ret += '\n';
+        elif(str_[pos_] == 't')
+          ret += '\t';
+        elif(str_[pos_] == 'r')
+          ret += '\r';
+        elif(str_[pos_] == '{')
+          ret += '{';
+        elif(str_[pos_] == '}')
+          ret += '}';
+        elif(str_[pos_] == '\\')
+          ret += '\\';
+        else
+          ret += str_[pos_];
+      }
+      else
+        ret += str_[pos_];
+      ++pos_;
+    }
+    return Token(ret);
+  }
 }
 
 string Lexer::get_string()
@@ -106,7 +147,7 @@ bool yan::Socket::Connect(string ip, int port, int sin_family)
 bool yan::Socket::Recv(string &data)
 {
   memset(sz_buffer, 0, sizeof(sz_buffer));
-  int ret = recv(sock, sz_buffer, sizeof(sz_buffer), 0);
+  int ret = recv(sock, sz_buffer, sizeof(sz_buffer) - 4, 0);
   if(ret < 0)
   {
     closesocket(sock);

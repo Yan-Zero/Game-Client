@@ -13,5 +13,6 @@ void info(std::string &arg);
 void error(std::string &arg);
 void show_message(std::string &arg);
 void show_help(std::string &arg);
+void update_help(std::string &arg);
 
 #endif

@@ -4,11 +4,13 @@
 #ifdef _WIN32
 #include <WINSOCK2.H>
 #pragma comment (lib, "ws2_32.lib")
-#endif
 
 #include <windows.h>
+#endif
 
+#include <stack>
 #include <string>
+
 namespace yan
 {
   class Socket
@@ -34,7 +36,7 @@ namespace yan
 
     #ifdef _WIN32
     SOCKET sock;
-    char sz_buffer[1024];
+    char sz_buffer[1024 + 4];
     #endif
 
     #ifdef __linux__

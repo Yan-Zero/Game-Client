@@ -8,6 +8,7 @@
 #include "client_command.h"
 #include "ui.hpp"
 #include <mutex>
+#include <vector>
 
 // 7000ms
 #define BEAT_INTERVAL 7000
@@ -25,7 +26,7 @@ std::mutex mtx; // 保护 cout
 HANDLE hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
 
-std::map<std::string, void (*)(std::string &)> func_map = {
+map<string, void (*)(std::string &)> func_map = {
   {"exit", &exit_program},
   {"quit", &exit_program},
   {"q", &exit_program},
@@ -37,6 +38,9 @@ std::map<std::string, void (*)(std::string &)> func_map = {
   {"error", &error},
   {"show_message", &show_message},
   {"show_help", &show_help},
+  {"update_help", &update_help},
+};
+map<std::string, std::string> cmd_list = {
 };
 
 
@@ -47,7 +51,7 @@ void help(string &arg) {
          << "    set name <name>: set your name" << endl
          << "    set server <ip>:<port>: set server" << endl
          << "    set ip <server ip>: set server ip" << endl
-         << "    set port <server port>: set server port" << endl;
+         << "    set port <server port>: set server port" << endl << endl;
   }
   elif(arg == "info")
   {
@@ -55,28 +59,33 @@ void help(string &arg) {
          << "    info:                     show your info" << endl
          << "    info room [room id]:      show room info" << endl
          << "    info player [player id]:  show player info" << endl
-         << "    info <player id>:         show player info" << endl;
+         << "    info <player id>:         show player info" << endl << endl;
   }
   elif(arg == "help")
   {
     cout << "help:" << endl
        << "    help:           show the help" << endl
-       << "    help <command>: show the help of <command>" << endl;
+       << "    help <command>: show the help of <command>" << endl << endl;
   }
   elif(arg == "")
   {
-    cout << "connect:  try to connect to server" << endl
-         << "exit:     exit the game" << endl
-         << "help:     show the all help" << endl
-         << "info:     show the info. Please type 'help info' to see more." << endl
-         << "message:  send message" << endl
-         << "player:   list all players in room" << endl
-         << "room:     the command of room. Please type 'help room' to see more." << endl
-         << "game:     show the game info. Please type 'help game' to see more." << endl;
+    const string list[] = {
+      "connect:  try to connect to server",
+      "exit:     exit the game",
+      "help:     show the all help",
+      "info:     show the info. Please type 'help info' to see more.",
+      "message:  send message",
+      "player:   list all players in room",
+      "game:     show the game info. Please type 'help game' to see more."
+    };
+    for (auto &cmd : list)
+      cout << cmd << endl;
+    for (auto &cmd : cmd_list)
+      cout << cmd.second << endl;
+    cout << endl;
   }
   else
     sock.Send("help " + arg);
-  cout << endl;
 }
 void exit_program(string &arg) {
   id = -2;
@@ -97,8 +106,8 @@ void exit_program(string &arg) {
 void set(string &arg)
 {
   Lexer lexer(arg);
-  auto arg_ = lexer.get_next();
-  auto value = lexer.get_next();
+  auto arg_ = lexer.get_next_token();
+  auto value = lexer.get_next_token();
   if(arg_.type() == Token::TokenType::kEnd)
   {
     arg = "set";
@@ -122,7 +131,7 @@ void set(string &arg)
       else return c;
     });
     cout << "name set to " << name << endl;
-    if(lexer.get_next().value() != "-f")
+    if(lexer.get_next_token().value() != "-f")
       sock.Send("rename " + name);
   }
   elif(arg_.value() == "server")
@@ -141,7 +150,7 @@ void set(string &arg)
 }
 void room(string &arg) {
   Lexer token(arg);
-  auto tk = token.get_next();
+  auto tk = token.get_next_token();
   if(tk.value() == "list")
     sock.Send("list room");
   else
@@ -173,7 +182,7 @@ void info(string &arg) {
     return;
   }
   Lexer lexer(arg);
-  auto tk = lexer.get_next();
+  auto tk = lexer.get_next_token();
   if(tk.value() == "room")
     sock.Send("info " + arg);
   elif(tk.value() == "player")
@@ -181,22 +190,50 @@ void info(string &arg) {
   else
     sock.Send("info player " + to_string(id));
 }
+void update_help(string &arg)
+{
+  Lexer lexer(arg);
+  cout << arg << endl;
+  auto tk = lexer.get_next_token();
+  while(tk.type() != Token::TokenType::kEnd)
+  {
+    cmd_list[tk.value()] = lexer.get_next_token().value();
+    tk = lexer.get_next_token();
+  }
+}
 
 
 void deal_command_from_server(string &arg)
 {
+  size_t index = 0;
   Lexer lexer(arg);
-  auto command = lexer.get_next();
-  if(command.type() == Token::TokenType::kEnd)
-    return;
-  auto it = func_map.find(command.value());
-  if(it == func_map.end())
+  string tmp;
+
+  auto tk = lexer.get_next_token();
+  while(tk.type() != Token::TokenType::kEnd)
   {
-    cout << "Unknown command: " << command.value() << endl;
-    return;
+    if(tk.type() == Token::TokenType::kLeftBracket)
+    {
+      auto command = lexer.get_next_token();
+      index = lexer.get_pos();
+      while(tk.type() != Token::TokenType::kRightBracket)
+        tk = lexer.get_next_token();
+      auto it = func_map.find(command.value());
+      if(it == func_map.end())
+        cout << "Unknown command: " << command.value() << endl;
+      {
+        tmp = arg.substr(index, lexer.get_pos() - index - 1);
+        it->second(tmp);
+      }
+    }
   }
-  arg = arg.substr(lexer.get_pos());
-  it->second(arg);
+  auto it = func_map.find(tk.value());
+  if(it == func_map.end())
+    cout << "Unknown command: " << tk.value() << endl;
+  {
+    tmp = arg.substr(index, lexer.get_pos() - index - 1);
+    it->second(tmp);
+  }
 }
 void thread_handler() {
   string arg, str;
@@ -207,7 +244,7 @@ void thread_handler() {
   {
     sock.Recv(arg);
     mtx.lock();
-    Get_Console_Cursor_Position(x, y);
+    Get_Console_Cursor_Position(x, y, hConsoleOutput);
     str = Read_Console_Line(y, x, hConsoleOutput);
     Move_Console_Cursor_To_Line_Begin(hConsoleOutput);
     deal_command_from_server(arg);
