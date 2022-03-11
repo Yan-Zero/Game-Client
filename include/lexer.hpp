@@ -18,6 +18,7 @@ public:
     RightBracket, 
     LeftParenthesis,
     RightParenthesis,
+    Comma,
   };
 
   Token(TokenType type) : type_(type) {}

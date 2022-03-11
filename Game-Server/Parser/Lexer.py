@@ -8,6 +8,7 @@ class TokenType(Enum):
   RightBracket = 3
   LeftParenthesis = 4
   RightParenthesis = 5
+  Comma = 6
 
 class Token:
   def __init__(self, type: TokenType, value: str = ""):
@@ -54,6 +55,9 @@ class Lexer:
     elif self.context[self.pos] == ')':
       self.pos += 1
       return Token(TokenType.RightParenthesis)
+    elif self.context[self.pos] == ',':
+      self.pos += 1
+      return Token(TokenType.Comma)
     ret = ""
     while  (self.pos < len(self.context)) and \
            (self.context[self.pos] != ' ' 

@@ -9,6 +9,7 @@ set(
     src/main.cpp
     src/socket.cpp
     src/client_func.cpp
+    src/lexer.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

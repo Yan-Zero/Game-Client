@@ -4,4 +4,5 @@
 
 - commands: `{ command | commands }`
 - command : `id(params) | { id params }` 
-- params  : `params, param | param`
+- params  : `params ("," | " ") param | param`
+- param   : `string`

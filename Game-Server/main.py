@@ -1,4 +1,4 @@
-import random
+from Server import *
 import socket, sys, time
 import threading
 from Parser.Lexer import *
@@ -6,25 +6,8 @@ sys.path.append("./Game")
 from ddp import * 
 
 Lock = threading.Lock()
-Players = {
-}
-
-class Player:
-  sock: socket
-  addr: tuple
-  encoding = 'utf-8'
-
-  def __init__(self, uid, socket: socket, addr, name: str) -> None:
-    self.sock = socket
-    self.addr = addr
-    self.uid = uid
-    self.name = name
-
-  def send(self, msg: str):
-    self.sock.send(b"{" + bytes(msg, self.encoding) + b'}')
-
-  def recv(self) -> str:
-    return self.sock.recv(1024).decode(self.encoding)
+Players = {}
+Rooms = {}
 
 def check_name(str) -> bool:
   if str == "" or len(str) > 32:
@@ -58,6 +41,20 @@ def info(player: Player, lexer: Lexer):
 def client_exit(player: Player, lexer: Lexer):
   return None
 
+def rename(player: Player, lexer: Lexer):
+  tk = lexer.get_next_token()
+  if not check_name(tk):
+    player.send('error "Invalid name!"')
+    return 'set name ' + player.name + ' -f'
+  player.name = tk
+  if lexer.get_next_token() == "-s":
+    return None
+  return 'show_message Server "  Your name is ' + player.name + ' now."'
+
+Help_List = {
+  "room":   "room:     the command of room. Please type 'help room' to see more.",
+}
+
 Help_Info = {
   "room" : [
     "  Running HOST command needs that the player is host of the room.",
@@ -79,24 +76,10 @@ def help(player: Player, lexer: Lexer):
   else:
     return f'error "HELP - Unknown command: {tk}!\n"'
 
-Help_List = {
-  "room":   "room:     the command of room. Please type 'help room' to see more.",
-}
-
 def update_help(player: Player, lexer: Lexer):
   for key in Help_List:
     player.send(f'update_help "{key}" "{Help_List[key]}"')
   return None
-
-def rename(player: Player, lexer: Lexer):
-  tk = lexer.get_next_token()
-  if not check_name(tk):
-    player.send('error "Invalid name!"')
-    return 'set name ' + player.name + ' -f'
-  player.name = tk
-  if lexer.get_next_token() == "-s":
-    return None
-  return 'show_message Server "  Your name is ' + player.name + ' now."'
 
 Function_Map = {
   "info": info,
@@ -160,28 +143,17 @@ def Accepting(socket: socket):
     clientsocketaddr = socket.accept()
     threading.Thread(target = Handler, args = clientsocketaddr).start()
 
+def main(port: int, max_players: int, max_rooms: int):
+  # 创建 socket 对象
+  serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  serversocket.bind(("127.0.0.1", port))
+  serversocket.listen(max_players)
 
-# 创建 socket 对象
-serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-port = 23345
-serversocket.bind(("127.0.0.1", port))
-# 监听
-max_room = 5
-max_player_of_room = 5
-serversocket.listen(max_player_of_room * max_room)
+  acceptingthread = threading.Thread(target = Accepting, args = (serversocket))
+  acceptingthread.daemon = True
+  acceptingthread.start()
+  while True:
+    command = input()
 
-acceptingthread = threading.Thread(target = Accepting, args = (serversocket))
-acceptingthread.daemon = True
-acceptingthread.start()
-while True:
-    i = input()
-    if i == "exit":
-        break
-    elif i == 'q':
-        break
-    elif i[0] == 'E':
-        for player in Players.values():
-            player.send(i[1:])
-    else:
-        for player in Players.values():
-            player.send("show_message Server \"" + i + "\"")
+if __name__ == "__main__":
+  main(2256, 50, 10)

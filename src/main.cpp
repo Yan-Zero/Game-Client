@@ -108,17 +108,17 @@ void set(string &arg)
   Lexer lexer(arg);
   auto arg_ = lexer.get_next_token();
   auto value = lexer.get_next_token();
-  if(arg_.type() == Token::TokenType::EOC)
+  if(arg_ == Token::TokenType::EOC)
   {
     arg = "set";
     help(arg);
   }
-  elif(value.type() == Token::TokenType::EOC)
+  elif(value == Token::TokenType::EOC)
   {
     cout << "Please input the value." << endl;
     return;
   }
-  elif(arg_.value() == "name")
+  elif(arg_ == "name")
   {
     name = value.value();
     transform(name.begin(), name.end(), name.begin(), [](char c) { 
@@ -134,16 +134,16 @@ void set(string &arg)
     if(lexer.get_next_token().value() != "-f")
       sock.Send("rename " + name);
   }
-  elif(arg_.value() == "server")
+  elif(arg_ == "server")
   {
     ip = value.value().substr(0, value.value().find(":"));
     port = stoi(value.value().substr(value.value().find(":") + 1));
   }
-  elif(arg_.value() == "ip")
+  elif(arg_ == "ip")
     ip = value.value();
-  elif(arg_.value() == "port")
+  elif(arg_ == "port")
     port = stoi(value.value());
-  elif(arg_.value() == "__id__")
+  elif(arg_ == "__id__")
     id = stoll(value.value());
   else
     cout << "set: unknown command" << endl;
@@ -151,7 +151,7 @@ void set(string &arg)
 void room(string &arg) {
   Lexer token(arg);
   auto tk = token.get_next_token();
-  if(tk.value() == "list")
+  if(tk == "list")
     sock.Send("list room");
   else
     sock.Send("room " + arg);
@@ -183,9 +183,9 @@ void info(string &arg) {
   }
   Lexer lexer(arg);
   auto tk = lexer.get_next_token();
-  if(tk.value() == "room")
+  if(tk == "room")
     sock.Send("info " + arg);
-  elif(tk.value() == "player")
+  elif(tk == "player")
     sock.Send("info " + arg);
   else
     sock.Send("info player " + to_string(id));
@@ -212,7 +212,7 @@ void deal_command_from_server(string &arg)
   auto tk = lexer.get_next_token();
   while(tk.type() != Token::TokenType::EOC)
   {
-    if(tk.type() == Token::TokenType::LeftBracket)
+    if(tk== Token::TokenType::LeftBracket)
     {
       auto command = lexer.get_next_token();
       index = lexer.get_pos();
