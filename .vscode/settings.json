@@ -73,7 +73,8 @@
     "deque": "cpp",
     "unordered_map": "cpp",
     "memory_resource": "cpp",
-    "string_view": "cpp"
+    "string_view": "cpp",
+    "stack": "cpp"
   },
   "python.analysis.extraPaths": [
     "./Game-Server/Game"

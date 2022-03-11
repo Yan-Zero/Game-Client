@@ -4,11 +4,9 @@
 #ifdef _WIN32
 #include <WINSOCK2.H>
 #pragma comment (lib, "ws2_32.lib")
-
 #include <windows.h>
 #endif
 
-#include <stack>
 #include <string>
 
 namespace yan
@@ -44,6 +42,15 @@ namespace yan
     #endif
 
   };
-}
+};
+
+class Client : public yan::Socket
+{
+public:
+  Client(int af = -1, int type = -1, int protocol = -1) 
+    : Socket(af, type, protocol) {}
+  bool Send(const std::string &data)
+  { return Socket::Send("{" + data + "}"); };
+};
 
 #endif

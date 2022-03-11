@@ -8,7 +8,7 @@
 #include "client_command.h"
 #include "ui.hpp"
 #include <mutex>
-#include <vector>
+#include <parser.hpp>
 
 // 7000ms
 #define BEAT_INTERVAL 7000
@@ -16,17 +16,17 @@
 using namespace std;
 
 void thread_handler();
+auto sock = Client();
 string ip, name;
 int port;
 long long id;
-auto sock = yan::Socket();
 thread t;
 std::mutex mtx; // 保护 cout
 #ifdef _WIN32
 HANDLE hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
 
-map<string, void (*)(std::string &)> func_map = {
+map<string, void (*)(const vector<Token> &)> func_map = {
   {"exit", &exit_program},
   {"quit", &exit_program},
   {"q", &exit_program},
@@ -40,199 +40,68 @@ map<string, void (*)(std::string &)> func_map = {
   {"show_help", &show_help},
   {"update_help", &update_help},
 };
-map<std::string, std::string> cmd_list = {
-};
 
-
-void help(string &arg) {
-  if(arg == "set")
-  {
-    cout << "set:" << endl
-         << "    set name <name>: set your name" << endl
-         << "    set server <ip>:<port>: set server" << endl
-         << "    set ip <server ip>: set server ip" << endl
-         << "    set port <server port>: set server port" << endl << endl;
-  }
-  elif(arg == "info")
-  {
-    cout << "info:" << endl
-         << "    info:                     show your info" << endl
-         << "    info room [room id]:      show room info" << endl
-         << "    info player [player id]:  show player info" << endl
-         << "    info <player id>:         show player info" << endl << endl;
-  }
-  elif(arg == "help")
-  {
-    cout << "help:" << endl
-       << "    help:           show the help" << endl
-       << "    help <command>: show the help of <command>" << endl << endl;
-  }
-  elif(arg == "")
-  {
-    const string list[] = {
-      "connect:  try to connect to server",
-      "exit:     exit the game",
-      "help:     show the all help",
-      "info:     show the info. Please type 'help info' to see more.",
-      "message:  send message",
-      "player:   list all players in room",
-      "game:     show the game info. Please type 'help game' to see more."
-    };
-    for (auto &cmd : list)
-      cout << cmd << endl;
-    for (auto &cmd : cmd_list)
-      cout << cmd.second << endl;
-    cout << endl;
-  }
-  else
-    sock.Send("help " + arg);
-}
-void exit_program(string &arg) {
-  id = -2;
-  if(arg != "-no_save")
-  {
-    ofstream config("config.txt");
-    config << ip << ":" << port << endl
-           << name << endl;
-  }
-  else
-    std::cout << "bye~" << std::endl;
-  arg = "exit";
-  sock.Send(arg);
-  mtx.unlock();
-  sock.~Socket();
-  exit(0);
-}
-void set(string &arg)
-{
-  Lexer lexer(arg);
-  auto arg_ = lexer.scan();
-  auto value = lexer.scan();
-  if(arg_ == Token::TokenType::End)
-  {
-    arg = "set";
-    help(arg);
-  }
-  elif(value == Token::TokenType::End)
-  {
-    cout << "Please input the value." << endl;
-    return;
-  }
-  elif(arg_ == "name")
-  {
-    name = value.value();
-    transform(name.begin(), name.end(), name.begin(), [](char c) { 
-      if (c == ' ') return '-';
-      elif (c == '\t') return '-';
-      elif (c == '\n') return '-';
-      elif (c == '\r') return '-';
-      elif (c == '\f') return '-';
-      elif (c == '\v') return '-';
-      else return c;
-    });
-    cout << "name set to " << name << endl;
-    if(lexer.scan() != "-f")
-      sock.Send("rename " + name);
-  }
-  elif(arg_ == "server")
-  {
-    ip = value.value().substr(0, value.value().find(":"));
-    port = stoi(value.value().substr(value.value().find(":") + 1));
-  }
-  elif(arg_ == "ip")
-    ip = value.value();
-  elif(arg_ == "port")
-    port = stoi(value.value());
-  elif(arg_ == "__id__")
-    id = stoll(value.value());
-  else
-    cout << "set: unknown command" << endl;
-}
-void room(string &arg) {
-  Lexer token(arg);
-  auto tk = token.scan();
-  if(tk == "list")
-    sock.Send("list room");
-  else
-    sock.Send("room " + arg);
-}
-void _connect(string &arg) {
+void _connect(const vector<Token> &args) {
   sock.Connect(ip, port);
-  // 如果用了 utf-8，记得改
+  #ifdef _WIN32
+  // 一般而言， Win32 是 GBK， Linux 是 UTF-8 //
   sock.Send("encode gbk");
-  sock.Recv(arg);
-  if(arg == "OK")
+  #endif
+  #ifdef __linux__
+  sock.Send("encode utf-8");
+  #endif
+
+  string data;
+  sock.Recv(data);
+  if(data == "OK")
   {
     sock.Send("rename " + name + " -s");
     t = thread(thread_handler);
   }
   else
   {
-    cout << "recv data: " << arg << endl;
+    cout << "recv data: " << data << "EOF" << endl;
     cout << "connect to " << ip << ":" << port << " failed" << endl;
     sock.CloseConnect();
     id = -1;
   }
 }
-void info(string &arg) {
-  if(arg == "")
+void exit_program(const vector<Token> &args) {
+  id = -2;
+  bool no_save = false;
+  for (auto &i : args)
+    if(i == "-no_save")
+      no_save = true;
+  if(!no_save)
   {
-    cout << "id:   " << id << endl
-         << "name: " << name << endl;
-    return;
+    ofstream config("config.txt");
+    config << ip << ":" << port << endl
+           << name << endl;
   }
-  Lexer lexer(arg);
-  auto tk = lexer.scan();
-  if(tk == "room")
-    sock.Send("info " + arg);
-  elif(tk == "player")
-    sock.Send("info " + arg);
-  else
-    sock.Send("info player " + to_string(id));
+  std::cout << "bye~" << std::endl;
+  sock.Send("exit");
+  mtx.unlock();
+  exit(0);
 }
-void update_help(string &arg)
+void deal_command(const string &arg)
 {
-  Lexer lexer(arg);
-  cout << arg << endl;
-  auto tk = lexer.scan();
-  while(tk.type() != Token::TokenType::End)
+  Parser parser(arg);
+  try { parser.parse(); }
+  catch (std::exception &e)
+  { error({Token(e.what())}); }
+
+  for(auto &cmd : parser.PCMDs)
   {
-    cmd_list[tk.value()] = lexer.scan().value();
-    tk = lexer.scan();
-  }
-}
-
-
-void deal_command_from_server(string &arg)
-{
-  size_t index = 0;
-  Lexer lexer(arg);
-  string tmp;
-
-  auto tk = lexer.scan();
-  while(tk.type() != Token::TokenType::End)
-  {
-    if(tk== Token::TokenType::LeftBracket)
+    auto func_name = cmd->GetFuncName();
+    transform(func_name.begin(), func_name.end(), func_name.begin(), ::tolower);
+    auto func = func_map.find(func_name);
+    if(func == func_map.end())
     {
-      auto command = lexer.scan();
-      index = lexer.get_pos();
-      while(tk.type() != Token::TokenType::RightBracket)
-        tk = lexer.scan();
-      auto it = func_map.find(command.value());
-      if(it == func_map.end())
-        cout << "Unknown command: " << command.value() << endl;
-      {
-        tmp = arg.substr(index, lexer.get_pos() - index - 1);
-        it->second(tmp);
-      }
+      cout << "command not found: " << func_name << endl;
+      continue;
     }
-  }
-  auto it = func_map.find(tk.value());
-  if(it == func_map.end())
-    cout << "Unknown command: " << tk.value() << endl;
-  {
-    tmp = arg.substr(index, lexer.get_pos() - index - 1);
-    it->second(tmp);
+    else
+      func->second(cmd->GetArgs_v());
   }
 }
 void thread_handler() {
@@ -247,41 +116,48 @@ void thread_handler() {
     Get_Console_Cursor_Position(x, y, hConsoleOutput);
     str = Read_Console_Line(y, x, hConsoleOutput);
     Move_Console_Cursor_To_Line_Begin(hConsoleOutput);
-    deal_command_from_server(arg);
+    deal_command(arg);
     cout << str;
     mtx.unlock();
   }
   return;
 }
 void sigint_handler(int sig) {
-  if(sig == SIGINT){
-    string arg = "-no_save";
-    exit_program(arg);
-  }
+  if(sig == SIGINT)
+    exit_program({Token("-no_save")});
 }
-
 
 int main(int, char**) {
   signal(SIGINT, sigint_handler);
 
+  #ifdef _WIN32
+  cout << "If you have the problme in print Chinese, please use gbk encoding." << endl;
+  cout << "Type 'chcp 936' in cmd/powershell to change the encoding to gbk." << endl;
+  #endif
+
   // read the config.txt file
   ifstream config("config.txt");
-  if (!config) {
-    cerr << "Could not open config.txt" << endl;
-    return 1;
+  if (config) {
+    // read the frist line as sever ip
+    config >> ip;
+    port = atoi(ip.substr(ip.find(':') + 1).c_str());
+    ip = ip.substr(0, ip.find(':'));
+    // read the second line as name
+    config >> name;
+    config.close();
   }
-  // read the frist line as sever ip
-  config >> ip;
-  port = atoi(ip.substr(ip.find(':') + 1).c_str());
-  ip = ip.substr(0, ip.find(':'));
-  // read the second line as name
-  config >> name;
-  if(name == "")
+  else {
+    cerr << "Could not open config.txt" << endl;
+    ip = "127.0.0.1";
+    port = 2333;
+  }
+  
+  name = string_trim(name);
+  if(name.empty())
   {
     cout << "please enter your name: ";
-    cin >> name;
+    getline(cin, name);
   }
-  config.close();
   transform(name.begin(), name.end(), name.begin(), [](char c) { 
     if (c == ' ') return '-';
     elif (c == '\t') return '-';
@@ -295,7 +171,7 @@ int main(int, char**) {
 
   thread _t([](){
     string command, param;
-    _connect(param);
+    _connect({});
 
     while(id != -2) {
       mtx.lock();
@@ -306,20 +182,9 @@ int main(int, char**) {
       command = string_trim(command);
       if(command == "")
         continue;
-      if(command.find(" ") != string::npos)
-      {
-        param = command.substr(command.find(" ") + 1);
-        command = command.substr(0, command.find(" "));
-      }
-      else
-        param = "";
-      transform(command.begin(), command.end(), command.begin(), ::tolower);
 
       mtx.lock();
-      if(func_map.find(command) != func_map.end())
-        func_map[command](param);
-      else
-        cout << "command \"" << command << "\" not found" << endl;
+      deal_command(command);
       mtx.unlock();
     }
   });

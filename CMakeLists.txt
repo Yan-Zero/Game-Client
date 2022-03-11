@@ -4,6 +4,8 @@ project(Game-Client VERSION 0.1.0)
 include(CTest)
 enable_testing()
 
+# add_definitions(-D_DEBUG)
+
 set(
   SOURCES
     src/main.cpp

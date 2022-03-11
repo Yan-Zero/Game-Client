@@ -1,6 +1,7 @@
 ﻿#ifndef TOKEN_HPP_
 #define TOKEN_HPP_
 
+#include <vector>
 #include <string>
 #define elif else if
 
@@ -23,9 +24,11 @@ public:
   };
 
   Token(TokenType type) : m_type(type) {}
-  Token(std::string str, TokenType type) : m_str(str), m_type(type) {};
-  inline TokenType type() { return m_type; }
-  inline std::string value() { return m_str; }
+  Token(const Token &other) : m_type(other.m_type), m_value(other.m_value) {}
+  Token(const std::string &str, TokenType type) : m_value(str), m_type(type) {};
+  Token(const std::string &str) : m_value(str), m_type(TokenType::String) {};
+  inline TokenType type() const { return m_type; }
+  inline std::string value() const { return m_value; }
   inline static std::string type_to_string(TokenType type) {
     switch(type) {
       case TokenType::End: return "End";
@@ -38,27 +41,27 @@ public:
       default: return "Unknown";
     }
   }
-  inline bool operator==(const Token &other) {
-    return m_type == other.m_type && m_str == other.m_str;
+  inline bool operator==(const Token &other) const {
+    return m_type == other.m_type && m_value == other.m_value;
   }
-  inline bool operator==(const TokenType &other) {
-    return m_type != TokenType::String && m_type == other;
+  inline bool operator==(const TokenType &other) const {
+    return m_type == other;
   }
-  inline bool operator==(const std::string &other) {
-    return m_type == TokenType::String && m_str == other;
+  inline bool operator==(const std::string &other) const {
+    return m_type == TokenType::String && m_value == other;
   }
-  inline bool operator!=(const Token &other) {
+  inline bool operator!=(const Token &other) const {
     return !(*this == other);
   }
-  inline bool operator!=(const TokenType &other) {
+  inline bool operator!=(const TokenType &other) const {
     return !(*this == other);
   }
-  inline bool operator!=(const std::string &other) {
+  inline bool operator!=(const std::string &other) const {
     return !(*this == other);
   }
 
 private:
-  std::string m_str;
+  std::string m_value;
   TokenType m_type;
 };
 
@@ -72,6 +75,7 @@ public:
   Lexer(const Lexer &other) {
     m_str = other.m_str;
     m_pos = other.m_pos;
+    m_ch = other.m_ch;
   }
 
   Token scan();
@@ -107,10 +111,5 @@ private:
   }
 
 };
-
-// class Node
-// {
-
-// };
 
 #endif

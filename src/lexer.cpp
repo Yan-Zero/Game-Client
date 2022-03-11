@@ -4,13 +4,14 @@ using namespace std;
 
 Token Lexer::scan()
 {
+  read_char();
   ignore_space();
   if(m_ch == '\0')
     return Token(Token::TokenType::End);
   switch (m_ch)
   {
     case '\"':
-    case '\'': return Token(get_string(), Token::TokenType::String);
+    case '\'': return Token(get_string());
     case '(':  return Token(Token::TokenType::LeftParenthesis);
     case ')':  return Token(Token::TokenType::RightParenthesis);
     case ',':  return Token(Token::TokenType::Comma);
@@ -49,13 +50,14 @@ Token Lexer::scan()
           ret += m_ch;
         read_char();
       }
+      --m_pos;
       return Token(ret, Token::TokenType::String);
   }
 }
 
 string Lexer::get_string()
 {
-  string ret;
+  string ret = "";
   char ch = m_ch;
   read_char();
   while(ch != '\0' && m_ch != ch)
@@ -80,19 +82,31 @@ string Lexer::get_string()
       }
     }
     else
-      ret += m_str[m_pos];
+      ret += m_ch;
     read_char();
   }
   return ret;
 }
 
-void Parser::commands()
+void Parser::block()
 {
+  // { stmt stmt* }
   match(Token::TokenType::LeftBracket);
-  // { commands }
+  while(m_look != Token::TokenType::RightBracket)
+    stmt();
+  match(Token::TokenType::RightBracket);
+}
+
+void Parser::stmt()
+{
+  // block block*
   if(m_look == Token::TokenType::LeftBracket)
-    commands();
-  // { command, command* }
+  {
+    block();
+    while(m_look == Token::TokenType::LeftBracket)
+      block();
+  }
+  // command (, command)*
   else
   {
     command();
@@ -102,11 +116,11 @@ void Parser::commands()
       command();
     }
   }
-  match(Token::TokenType::RightBracket);
 }
 
 void Parser::command()
 {
+  m_pcmd = new PCommand();
   id();
   // id(params)
   if(m_look == Token::TokenType::LeftParenthesis)
@@ -118,28 +132,35 @@ void Parser::command()
   // id params
   else
     params();
+  PCMDs.push_back(m_pcmd);
 }
 
 void Parser::params()
 {
-  // param | param params
   if(m_look == Token::TokenType::String)
   {
     param();
-    params();
+    // param (, params)*
+    if(m_look == Token::TokenType::Comma)
+      while(m_look == Token::TokenType::Comma)
+      {
+        match(Token::TokenType::Comma);
+        param();
+      }
+    // param params
+    elif(m_look == Token::TokenType::String)
+      while(m_look == Token::TokenType::String)
+        param();
+    // param
   }
-  elif(m_look == Token::TokenType::Comma)
-  {
-    match(Token::TokenType::Comma);
-    param();
-    params();
-  }
-  return;
+  // ϵ
 }
 
 void Parser::param()
 {
+  auto tk = m_look;
   match(Token::TokenType::String);
+  m_pcmd->AddParam(tk);
 }
 
 void Parser::id()
@@ -155,4 +176,5 @@ void Parser::id()
     if(!isalnum(ch) && ch != '_')
       error("id must contain only letters, numbers, or underscores");
   }
+  m_pcmd->SetFuncName(id.value());
 }
