@@ -108,12 +108,12 @@ void set(string &arg)
   Lexer lexer(arg);
   auto arg_ = lexer.get_next_token();
   auto value = lexer.get_next_token();
-  if(arg_.type() == Token::TokenType::kEnd)
+  if(arg_.type() == Token::TokenType::EOC)
   {
     arg = "set";
     help(arg);
   }
-  elif(value.type() == Token::TokenType::kEnd)
+  elif(value.type() == Token::TokenType::EOC)
   {
     cout << "Please input the value." << endl;
     return;
@@ -195,7 +195,7 @@ void update_help(string &arg)
   Lexer lexer(arg);
   cout << arg << endl;
   auto tk = lexer.get_next_token();
-  while(tk.type() != Token::TokenType::kEnd)
+  while(tk.type() != Token::TokenType::EOC)
   {
     cmd_list[tk.value()] = lexer.get_next_token().value();
     tk = lexer.get_next_token();
@@ -210,13 +210,13 @@ void deal_command_from_server(string &arg)
   string tmp;
 
   auto tk = lexer.get_next_token();
-  while(tk.type() != Token::TokenType::kEnd)
+  while(tk.type() != Token::TokenType::EOC)
   {
-    if(tk.type() == Token::TokenType::kLeftBracket)
+    if(tk.type() == Token::TokenType::LeftBracket)
     {
       auto command = lexer.get_next_token();
       index = lexer.get_pos();
-      while(tk.type() != Token::TokenType::kRightBracket)
+      while(tk.type() != Token::TokenType::RightBracket)
         tk = lexer.get_next_token();
       auto it = func_map.find(command.value());
       if(it == func_map.end())

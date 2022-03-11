@@ -9,29 +9,32 @@ Token Lexer::get_next_token()
 {
   ignore_space();
   if(pos_ >= str_.size())
-    return Token(Token::TokenType::kEnd);
-  string ret;
-  if(str_[pos_] == '"' || str_[pos_] == '\'')
-    return Token(get_string(), Token::TokenType::kString);
-  elif(str_[pos_] == '{')
+    return Token(Token::TokenType::EOC);
+  switch (str_[pos_])
   {
-    ++pos_;
-    return Token("{", Token::TokenType::kLeftBracket);
-  }
-  elif(str_[pos_] == '}')
-  {
-    ++pos_;
-    return Token("}", Token::TokenType::kRightBracket);
-  }
-  else
-  {
-    while(str_[pos_] != ' ' && str_[pos_] != '\t' 
-      && str_[pos_] != '\n' && str_[pos_] != '\r' 
-      && str_[pos_] != '\f' && str_[pos_] != '\v' 
-      && str_[pos_] != '{' && str_[pos_] != '}')
+  case '\"':
+  case '\'':
+    return Token(get_string(), Token::TokenType::String);
+  case '{':
+    pos_++;
+    return Token(Token::TokenType::LeftBracket);
+  case '}':
+    pos_++;
+    return Token(Token::TokenType::RightBracket);
+  case '(':
+    pos_++;
+    return Token(Token::TokenType::LeftParenthesis);
+  case ')':
+    pos_++;
+    return Token(Token::TokenType::RightParenthesis);
+  default:
+    string ret;
+    while(pos_ < str_.size() 
+       && str_[pos_] != ' ' && str_[pos_] != '\t'
+       && str_[pos_] != '\n' && str_[pos_] != '\r'
+       && str_[pos_] != '\f' && str_[pos_] != '\v'
+       && str_[pos_] != '{' && str_[pos_] != '}')
     {
-      if(pos_ >= str_.size())
-        break;
       if(str_[pos_] == '\\')
       {
         ++pos_;
@@ -56,7 +59,7 @@ Token Lexer::get_next_token()
         ret += str_[pos_];
       ++pos_;
     }
-    return Token(ret);
+    return Token(ret, Token::TokenType::String);
   }
 }
 
