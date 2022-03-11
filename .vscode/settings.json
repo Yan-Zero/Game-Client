@@ -74,5 +74,8 @@
     "unordered_map": "cpp",
     "memory_resource": "cpp",
     "string_view": "cpp"
-  }
+  },
+  "python.analysis.extraPaths": [
+    "./Game-Server/Game"
+  ]
 }
