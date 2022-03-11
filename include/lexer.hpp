@@ -4,8 +4,9 @@
 #include <string>
 #define elif else if
 
-inline std::string string_trim(std::string &str) {
-  return str.erase(0, str.find_first_not_of(" \t\n\r\f\v")).erase(str.find_last_not_of(" \t\n\r\f\v") + 1);
+inline std::string string_trim(const std::string &str) {
+  std::string ret = str;
+  return ret.erase(0, ret.find_first_not_of(" \t\n\r\f\v")).erase(ret.find_last_not_of(" \t\n\r\f\v") + 1); 
 }
 
 class Token
@@ -25,6 +26,18 @@ public:
   Token(std::string str, TokenType type) : m_str(str), m_type(type) {};
   inline TokenType type() { return m_type; }
   inline std::string value() { return m_str; }
+  inline static std::string type_to_string(TokenType type) {
+    switch(type) {
+      case TokenType::End: return "End";
+      case TokenType::String: return "String";
+      case TokenType::LeftBracket: return "LeftBracket";
+      case TokenType::RightBracket: return "RightBracket";
+      case TokenType::LeftParenthesis: return "LeftParenthesis";
+      case TokenType::RightParenthesis: return "RightParenthesis";
+      case TokenType::Comma: return "Comma";
+      default: return "Unknown";
+    }
+  }
   inline bool operator==(const Token &other) {
     return m_type == other.m_type && m_str == other.m_str;
   }
@@ -33,6 +46,15 @@ public:
   }
   inline bool operator==(const std::string &other) {
     return m_type == TokenType::String && m_str == other;
+  }
+  inline bool operator!=(const Token &other) {
+    return !(*this == other);
+  }
+  inline bool operator!=(const TokenType &other) {
+    return !(*this == other);
+  }
+  inline bool operator!=(const std::string &other) {
+    return !(*this == other);
   }
 
 private:
@@ -43,10 +65,14 @@ private:
 class Lexer
 {
 public:
-  Lexer(std::string &str) {
+  Lexer(const std::string &str) {
     m_str = string_trim(str);
     m_pos = 0;
   };
+  Lexer(const Lexer &other) {
+    m_str = other.m_str;
+    m_pos = other.m_pos;
+  }
 
   Token scan();
   size_t get_pos() { return m_pos; }
@@ -81,5 +107,10 @@ private:
   }
 
 };
+
+// class Node
+// {
+
+// };
 
 #endif

@@ -131,7 +131,7 @@ void set(string &arg)
       else return c;
     });
     cout << "name set to " << name << endl;
-    if(lexer.scan().value() != "-f")
+    if(lexer.scan() != "-f")
       sock.Send("rename " + name);
   }
   elif(arg_ == "server")
