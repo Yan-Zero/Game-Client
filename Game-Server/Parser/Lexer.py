@@ -24,12 +24,10 @@ class Token:
   def __eq__(self, __o: object) -> bool:
     if isinstance(__o, Token):
       return self.type == __o.type and self.value == __o.value
-    if self.type == TokenType.String:
-      if __o is str:
-        return self.value == __o
-      return False
     elif __o is TokenType:
-        return self.type == __o
+      return self.type == __o
+    elif self.type == TokenType.String and isinstance(__o, str):
+      return self.value == __o
     return False
 
 class Lexer:
@@ -40,6 +38,7 @@ class Lexer:
     self.pos = 0
 
   def scan(self) -> Token:
+    self.read_char()
     self.ignore_space()
     if self.__ch == None:
       return Token(TokenType.EOF)
@@ -56,7 +55,8 @@ class Lexer:
     elif self.__ch == ',':
       return Token(TokenType.Comma)
     ret = ""
-    while self.__ch != None and self.__ch not in [' ', '\t', '\n', '\r', '\f', '\v']:
+    while self.__ch not in [' ' , '\t', '\n', '\r', '\f', \
+                            '\v', None, ",", "}", ")", "{", "("]:
       if self.__ch == '\\':
         self.read_char()
         if self.__ch == '"':
@@ -83,6 +83,9 @@ class Lexer:
           ret += self.__ch
       else:
         ret += self.__ch
+      self.read_char()
+    if self.__ch != None:
+      self.pos -= 1
     return Token(TokenType.String, ret)
 
   def get_string(self):
@@ -108,6 +111,7 @@ class Lexer:
           ret += self.__ch
       else:
         ret += self.__ch
+      self.read_char()
     return ret
 
   def ignore_space(self):
@@ -116,9 +120,12 @@ class Lexer:
 
   def read_char(self, ch: str = None):
     if self.pos >= len(self.context):
+      self.__ch = None
       return None
     self.__ch = self.context[self.pos]
     self.pos += 1
+
+    # read_char(ch) -> bool
     if not isinstance(ch, str):
       return None
     if ch != self.__ch:

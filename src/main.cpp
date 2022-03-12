@@ -18,8 +18,7 @@ using namespace std;
 void thread_handler();
 auto sock = Client();
 string ip, name;
-int port;
-long long id;
+int port, id;
 thread t;
 std::mutex mtx; // 保护 cout
 #ifdef _WIN32
@@ -39,9 +38,18 @@ map<string, void (*)(const vector<Token> &)> func_map = {
   {"show_message", &show_message},
   {"show_help", &show_help},
   {"update_help", &update_help},
+  {"player", &player_list},
+  {"print", &print},
+  {"disconnect", &disconnect}
 };
+extern map<string, string> cmd_list;
 
 void _connect(const vector<Token> &args) {
+  if(id != 0)
+  {
+    cout << "You are already connected to server." << endl;
+    return;
+  }
   sock.Connect(ip, port);
   #ifdef _WIN32
   // 一般而言， Win32 是 GBK， Linux 是 UTF-8 //
@@ -55,6 +63,7 @@ void _connect(const vector<Token> &args) {
   sock.Recv(data);
   if(data == "OK")
   {
+    id = 0;
     sock.Send("rename " + name + " -s");
     t = thread(thread_handler);
   }
@@ -85,6 +94,7 @@ void exit_program(const vector<Token> &args) {
 }
 void deal_command(const string &arg)
 {
+  // cout << "deal_command: " << arg << endl;
   Parser parser(arg);
   try { parser.parse(); }
   catch (std::exception &e)
@@ -97,8 +107,10 @@ void deal_command(const string &arg)
     auto func = func_map.find(func_name);
     if(func == func_map.end())
     {
-      cout << "command not found: " << func_name << endl;
-      continue;
+      if(cmd_list.find(func_name) != cmd_list.end())
+        sock.Send(arg);
+      else
+        cout << "unknown command: " << func_name << endl;
     }
     else
       func->second(cmd->GetArgs_v());
@@ -107,9 +119,7 @@ void deal_command(const string &arg)
 void thread_handler() {
   string arg, str;
   short x, y;
-  if(!id)
-    sock.Send("info player");
-  while(sock.IsConnected() && id != -2)
+  while(sock.IsConnected() && id >= 0)
   {
     sock.Recv(arg);
     mtx.lock();
@@ -120,6 +130,8 @@ void thread_handler() {
     cout << str;
     mtx.unlock();
   }
+  sock.CloseConnect();
+  id = 0;
   return;
 }
 void sigint_handler(int sig) {
@@ -189,4 +201,5 @@ int main(int, char**) {
     }
   });
   _t.join();
+  t.join();
 }

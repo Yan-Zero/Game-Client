@@ -15,5 +15,8 @@ void error(const std::vector<Token> &arg);
 void show_message(const std::vector<Token> &arg);
 void show_help(const std::vector<Token> &arg);
 void update_help(const std::vector<Token> &arg);
+void player_list(const std::vector<Token> &args);
+void print(const std::vector<Token> &args);
+void disconnect(const std::vector<Token> &args);
 
 #endif

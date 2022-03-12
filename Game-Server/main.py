@@ -1,13 +1,17 @@
 from Server import *
-import socket, sys, time
-import threading
+import threading, Game.DDP, socket
 from Parser.Lexer import *
-sys.path.append("./Game")
-from ddp import * 
+from Parser.Parser import *
 
 Lock = threading.Lock()
-Players = {}
-Rooms = {}
+Players: dict[int, Player] = {
+}
+UnusedID: dict[str, set[int]] = {}
+Rooms: dict[int, Room] = {
+  0: Room("Server", Player(0, None, None, "Server")),
+}
+Rooms[0].UID = 0
+
 
 def check_name(str) -> bool:
   if str == "" or len(str) > 32:
@@ -17,37 +21,75 @@ def check_name(str) -> bool:
       return False
   return True
 
-def info(player: Player, lexer: Lexer):
-  value = lexer.scan()
-  if value == "room":
-    pass
-  elif value == "player":
-    value = lexer.scan()
-    if value == "":
+def list_info(player: Player, args: list[Token]):
+  if len(args) == 0:
+    return 'error "Invalid arguments!"'
+  if args[0].value == "player":
+    ret = '"  uid\t\tname" '
+    for uid in Players:
+      ret += '"  ' + str(uid) + '\t\t' + Players[uid].name + '" '
+    return "show_message Server " + ret
+  elif args[0].value == "room":
+    ret = '"  uid\t\tname" '
+    for uid in Rooms:
+      ret += '"  ' + str(uid) + '\t\t' + Rooms[uid].Name + '" '
+    return "show_message Server " + ret
+  else:
+    return 'error "Invalid arguments!"'
+
+def info(player: Player, args: list[Token]):
+  if len(args) == 0:
+    return 'error "The argument of info must be room or player!"'
+  if args[0] == "room":
+    if len(args) == 1:
+      if player.room.UID != 0:
+        return 'show_message Server "  You are in room ' + player.room.Name + '."'
+      else:
+        return list_info(player, args)
+    else:
+      value = int(args[1].value)
+      if value in Rooms:
+        ret  = '"  name: ' + Rooms[value].Name + '" '
+        ret += '"  host:" '
+        ret += '"      uid : ' + str(Rooms[value].Host.uid) + '" '
+        ret += '"      name: ' + Rooms[value].Host.name + '" '
+        ret += '"  players:" '
+        for player in Rooms[value].Players:
+          ret += '"      uid : ' + str(player.uid) + '" '
+          ret += '"      name: ' + player.name + '" '
+          ret += '"      ready: ' + str(player.ready) + '" '
+          ret += '"      "'
+        return 'show_message Server ' + ret
+      else:
+        return 'error "Room ' + args[1].value + ' does not exist!"'
+  elif args[0] == "player":
+    if len(args) == 1:
       value = str(player.uid)
+    else:
+      value = args[1].value
     try:
       uid = int(value)
       ret  = '"  name: ' + Players[uid].name + '" '
       ret += '"  uid:  ' + str(uid) + '" '
       return "show_message Server " + ret
     except Exception as e:
-      print(player.uid, e)
-      player.send('recv 2')
+      print(f"Error(Player: {player.name}[{player.uid}]): ", e)
       player.send('error "' + str(e) + '"')
       return 'error "Invalid player id!"'
   else:
     return 'error "The argument of info must be room or player!"'
 
-def client_exit(player: Player, lexer: Lexer):
+def client_exit(player: Player, args: list[Token]):
   return None
 
-def rename(player: Player, lexer: Lexer):
-  tk = lexer.scan()
-  if not check_name(tk):
+def rename(player: Player, args: list[Token]):
+  if len(args) == 0:
+    return 'error "rename - Invalid arguments!"'
+  if not check_name(args[0].value):
     player.send('error "Invalid name!"')
     return 'set name ' + player.name + ' -f'
-  player.name = tk
-  if lexer.scan() == "-s":
+  player.name = args[0].value
+  if len(args) > 1 and args[1].value == "-s":
     return None
   return 'show_message Server "  Your name is ' + player.name + ' now."'
 
@@ -69,14 +111,15 @@ Help_Info = {
   ]
 }
 
-def help(player: Player, lexer: Lexer):
-  tk = lexer.scan()
-  if tk in Help_Info:
-    return f'show_help "{tk}:" "' + '" "'.join(Help_Info[tk]) + "\""
+def help(player: Player, args: list[Token]):
+  if len(args) == 0:
+    return 'error "No command specified!"'
+  if args[0].value in Help_Info:
+    return f'show_help "{args[0].value}:" "' + '" "'.join(Help_Info[args[0].value]) + "\" ' '"
   else:
-    return f'error "HELP - Unknown command: {tk}!\n"'
+    return f'error "HELP - Unknown command: {args[0].value}!\n"'
 
-def update_help(player: Player, lexer: Lexer):
+def update_help(player: Player, args: list[Token]):
   for key in Help_List:
     player.send(f'update_help "{key}" "{Help_List[key]}"')
   return None
@@ -87,36 +130,44 @@ Function_Map = {
   "help": help,
   "rename": rename,
   "update_help": update_help,
+  "list": list_info,
+
 }
 
 def Player_Command(player: Player, data: str):
-  tk = Lexer(data)
-  command = tk.scan()
-  if command == "":
-    return None
-  if command in Function_Map:
-    return Function_Map[command](player, tk)
-  return f'error "Unknown command: {command}!"'
+  parser = Parser(data)
+  try:
+    parser.parse()
+    for cmd in parser.PCMDs:
+      if cmd.func_name in Function_Map:
+        return Function_Map[cmd.func_name](player, cmd.args)
+      else:
+        return 'error "Unknown command: ' + cmd.func_name + '!"'
+  except Exception as e:
+    print(f"Error(Player: {player.name}[{player.uid}]): ", e)
+    return 'error "' + str(e) + '"'
 
-def Handler(clientsocket: socket, addr):
+def Handler(clientsocket, addr):
   # 对接
   data = clientsocket.recv(1024).decode('utf-8')
-  tk = Lexer(data)
-  if tk.scan() != "encode":
-      clientsocket.close()
-      return
-  encoding = tk.scan()
+  parser = Parser(data)
+  parser.parse()
+  if parser.PCMDs[0].func_name != "encode":
+    clientsocket.close()
+    return
+  encoding = parser.PCMDs[0].args[0].value
   clientsocket.send('OK'.encode(encoding))
 
   # 校验身份，分配 id，并重命名
   data = clientsocket.recv(1024).decode(encoding)
-  uid = hash(data + str(addr))
-  player = Player(uid, clientsocket, addr, "Anonymous")
+  player = Player(UnusedID['player'].pop(), clientsocket, addr, "Anonymous")
   player.encoding = encoding
-  Players[uid] = player
+  Players[player.uid] = player
   Player_Command(player, data)
-  player.send('set __id__ ' + str(player.uid))
   Player_Command(player, 'update_help')
+  player.send('set __id__ ' + str(player.uid))
+  player.send(info(player, [Token(TokenType.String, "player")]))
+  Rooms[0].add_player(player)
 
   # 正式运行
   while True:
@@ -127,6 +178,8 @@ def Handler(clientsocket: socket, addr):
       try:
         player.send('error "' + str(e) + '"')
       except Exception as ex:
+        del Players[player.uid]
+        UnusedID['player'].add(player.uid)
         print(ex)
         break
     else:
@@ -134,10 +187,11 @@ def Handler(clientsocket: socket, addr):
       if ret != None:
         player.send(ret)
       if data == "exit":
-        del Players[uid]
+        del Players[player.uid]
+        UnusedID['player'].add(player.uid)
         player.sock.close()
 
-def Accepting(socket: socket):
+def Accepting(socket):
   while True:
     # 建立客户端连接
     clientsocketaddr = socket.accept()
@@ -148,12 +202,16 @@ def main(port: int, max_players: int, max_rooms: int):
   serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   serversocket.bind(("127.0.0.1", port))
   serversocket.listen(max_players)
+  UnusedID['player'] = set(range(1, max_players + 1))
+  UnusedID['room'] = set(range(1, max_rooms + 1))
 
-  acceptingthread = threading.Thread(target = Accepting, args = (serversocket))
+  acceptingthread = threading.Thread(target = Accepting, args = (serversocket, ))
   acceptingthread.daemon = True
   acceptingthread.start()
   while True:
     command = input()
+    for player in Players.values():
+      player.send(command)
 
 if __name__ == "__main__":
-  main(2256, 50, 10)
+  main(23333, 50, 10)

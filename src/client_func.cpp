@@ -11,9 +11,27 @@ extern Client sock;
 map<std::string, std::string> cmd_list = {
 };
 extern std::string name, ip;
-extern int port;
-extern long long id;
+extern int port, id;
 
+void disconnect(const std::vector<Token> &args) {
+  if(id == 0)
+  {
+    cout << "You are not connected to server." << endl;
+    return;
+  }
+  sock.CloseConnect();
+  id = -2;
+  cout << "Disconnected from server." << endl;
+}
+void print(const std::vector<Token> &args)
+{
+  for(auto &i : args)
+    cout << i.value();
+}
+void player_list(const std::vector<Token> &args)
+{
+  sock.Send("list player");
+}
 void help(const std::vector<Token> &args) {
   if(!args.size())
   {
@@ -120,7 +138,7 @@ void set(const std::vector<Token> &args) {
   elif(args[0] == "port")
     port = stoi(args[1].value());
   elif(args[0] == "__id__")
-    id = stoll(args[1].value());
+    id = stoi(args[1].value());
   else
     cout << "set: unknown command \"" << args[0].value() << "\"" << endl << endl;
 }
@@ -159,6 +177,9 @@ void update_help(const std::vector<Token> &args)
     cout << "Update Help: too few arguments" << endl;
     return;
   }
-  for(auto i = args.begin(); i < args.end(); )
-    cmd_list[i->value()] = (++i)->value();
+  for(auto i = args.begin(); i != args.end(); )
+  {
+    cmd_list[i->value()] = (i + 1)->value();
+    i += 2;
+  }
 }

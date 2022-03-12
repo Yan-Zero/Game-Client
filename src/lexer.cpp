@@ -50,6 +50,7 @@ Token Lexer::scan()
           ret += m_ch;
         read_char();
       }
+      // if(!m_ch)
       --m_pos;
       return Token(ret, Token::TokenType::String);
   }
