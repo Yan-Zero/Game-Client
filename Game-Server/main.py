@@ -1,3 +1,4 @@
+from shutil import ExecError
 from Server import *
 import threading, Game.DDP, socket
 from Parser.Lexer import *
@@ -7,100 +8,56 @@ Lock = threading.Lock()
 Players: dict[int, Player] = {
 }
 UnusedID: dict[str, set[int]] = {}
-Rooms: dict[int, Room] = {
-  0: Room("Server", Player(0, None, None, "Server", None), 0),
-}
+ServerRoom = Room("Server", Player(0, None, None, "Server", None), 0)
 
 def room(player: Player, args: list[Token]):
   if len(args) == 0:
     return 'help room'
-  if args[0].value == "create":
-    if len(args) == 1:
-      return 'error "room create - Invalid arguments!"'
-    if len(args) == 2:
-      if player.room.UID != 0:
-        return 'error "You are already in a room!"'
-      if not check_name(args[1].value):
-        return 'error "Invalid room name!"'
-      if len(UnusedID['room']) == 0:
-        return 'error "The count of rooms is full!"'
-      room = Room(args[1].value, player, UnusedID['room'].pop())
-      Lock.acquire()
-      Rooms[room.UID] = room
-      Lock.release()
-      player.send('show_message Server "  You created room ' + room.Name + '."')
-      return 'info room ' + str(room.UID)
+  if args[0] == "leave":
+    player.room.leave_room(player)
+  elif args[0] == 'close':
+    if player.room.Host != player:
+      return 'error "You aren\'t the host of room!'
+    player.room.close()
+  elif len(args) == 1:
+    if args[0] == "start":
+      # 鉴权
+      if player.room.Host != player:
+        return 'error "You aren\'t the host of room!'
+      player.room.start()
+    elif args[0] == 'stop':
+      if player.room.Host != player:
+        return 'error "You aren\'t the host of room!'
+      player.room.stop()
     else:
-      return 'error "room create - Invalid arguments!"'
+      return f'error "room doesn\'t support \'{ args[0].value }\' arguments!'
+  # 创建房间
+  elif args[0].value == "create":
+    if not check_name(args[1].value):
+      return 'error "Invalid room name!"'
+    if len(UnusedID['room']) == 0:
+      return 'error "The count of rooms is full!"'
+    room = Room(args[1].value, player, UnusedID['room'].pop())
+    return 'info room ' + str(room.UID)
+  # 加入
   elif args[0].value == "join":
-    if len(args) == 1:
-      return 'error "room join - Invalid arguments!"'
-    if len(args) == 2:
-      value = int(args[1].value)
-      if value in Rooms:
-        player.send('room leave')
-        Rooms[value].add_player(player)
-        return 'info room ' + str(Rooms[value].UID)
-      else:
-        return 'error "Room ' + args[1].value + ' does not exist!"'
-    else:
-      return 'error "room join - Invalid arguments!"'
-  elif args[0].value == "leave":
-    if player.room.UID == 0:
-      return 'error "You are not in any room!"'
-    t_room: Room = player.room
-    Rooms[0].add_player(player)
-    if t_room.Host == player:
-      if len(t_room.Players) != 1:
-        t_room.Host = t_room.Players[0]
-        t_room.Host.send('show_message Server "  You are now the host of this room."')
-        return None
-      else:
-        Lock.acquire()
-        del Rooms[t_room.UID]
-        UnusedID['room'].add(t_room.UID)
-        Lock.release()
-        return 'show_message Server "  The room has been deleted because it was empty."'
-    else:
-      return None
-  elif args[0].value == "start":
-    if player.room.UID == 0:
-      return 'error "You are not in any room!"'
-    if player.room.Host != player:
-      return 'error "You are not the host of this room!"'
-    player.room.start()
-    return None
+    ServerRoom[int(args[1].value)].join_room(player)
+  # 踢人
   elif args[0].value == "kick":
-    if player.room.UID == 0:
-      return 'error "You are not in any room!"'
     if player.room.Host != player:
       return 'error "You are not the host of this room!"'
-    if len(args) == 1:
-      return 'error "room kick - Invalid arguments!"'
-    if len(args) == 2:
-      if args[1].value.isdigit():
-        value = Players[int(args[1].value)]
-      else:
-        for i in player.room.Players:
-          if i.name == args[1].value:
-            value = i
-            break
-      if value in player.room.Players:
-        player.send('room leave')
-        return None
-      else:
-        return 'error "Player ' + args[1].value + ' does not exist in this room!"'
+    value = None
+    if args[1].value.isdigit():
+      value = Players[int(args[1].value)]
     else:
-      return 'error "room kick - Invalid arguments!"'
-  elif args[0].value == "stop":
-    if player.room.UID == 0:
-      return 'error "You are not in any room!"'
-    if player.room.Host != player:
-      return 'error "You are not the host of this room!"'
-    player.room.stop()
-    return None
+      for i in player.room.Players:
+        if i.name == args[1].value:
+          value = i
+          break
+      return f'error f"{args[1].value} couldn\'t been found.'
+    player.room.kick(value)
   else:
-    return 'error "Invalid arguments!"'
+    return 'error "ROOM: Invalid arguments!"'
 
 def check_name(str) -> bool:
   if str == "" or len(str) > 32:
@@ -194,6 +151,7 @@ Help_Info = {
     "      room create <room name>: create a room",
     "      room join <room id>:     join a room",
     "      room leave:              leave a room",
+    " HOST room close:              close the room",
     " HOST room kick <player id>:   kick a player",
     " HOST room kick <player name>: kick a player",
     " HOST room start:              start the game",
@@ -234,7 +192,7 @@ def Player_Command(player: Player, data: str):
       else:
         return 'error "Unknown command: ' + cmd.func_name + '!"'
   except Exception as e:
-    print(f"Error(Player: {player.name}[{player.uid}]): ", e)
+    # print(f"Error(Player: {player.name}[{player.uid}]): ", e)
     return 'error "' + str(e) + '"'
 
 def Handler(clientsocket, addr):
@@ -267,7 +225,7 @@ def Handler(clientsocket, addr):
       try:
         player.send('error "' + str(e) + '"')
       except Exception as ex:
-        player.room.exit_room(player)
+        player.room.leave_room(player)
         del Players[player.uid]
         UnusedID['player'].add(player.uid)
         print(ex)
@@ -277,7 +235,7 @@ def Handler(clientsocket, addr):
       if ret != None:
         player.send(ret)
       if data == "exit":
-        player.room.exit_room(player)
+        player.room.leave_room(player)
         del Players[player.uid]
         UnusedID['player'].add(player.uid)
         player.sock.close()
